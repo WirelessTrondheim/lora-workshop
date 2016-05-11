@@ -3,7 +3,7 @@ set -eu
 
 markdown README.md > index.html
 
-tar -zcf /tmp/build.tar.gz .
+tar --exclude-vcs -zcf /tmp/build.tar.gz .
 
 scp /tmp/build.tar.gz web:/tmp/
 
