@@ -30,9 +30,9 @@ You need to bring your laptop.
 
 We bring the hardware:
 
-* 4x [Nucleo-L152RE](https://developer.mbed.org/platforms/ST-Nucleo-L152RE/)
+* 6x [Nucleo-L152RE](https://developer.mbed.org/platforms/ST-Nucleo-L152RE/)
+* 6x [Semtech SX1276MB1xAS](https://developer.mbed.org/components/SX1276MB1xAS/)
 * 2x [Seed Grove Shield V2](https://developer.mbed.org/components/Seeed-Grove-Shield-V2/)
-* 4x [Semtech SX1276MB1xAS](https://developer.mbed.org/components/SX1276MB1xAS/)
 
 # 1. Acquire knowledge about LoRa
 
