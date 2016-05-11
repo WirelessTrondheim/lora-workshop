@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eu
 
-markdown index.md > index.html
+markdown README.md > index.html
 
 tar -zcf /tmp/build.tar.gz .
 
