@@ -501,3 +501,6 @@ Inspect the data using a cli MQTT client:
 	mosquitto_sub -h staging.thethingsnetwork.org -P "hki96WIXS1oMnj0D8109A/ug791ywNuQemOGZfoqpRU=" -u 70B3D57ED000019F -t "+/devices/#"
 
 `-P` is the access key and -u is the AppEui.
+
+You should see JSON objects where one of the properties is named `payload`. The payload contains the base64 encoded message.
+Decode it with `echo SGVpIHZlcmRlbg== | base64 -d`.
