@@ -30,9 +30,9 @@ You need to bring your laptop.
 
 We bring the hardware:
 
-* 6x [Nucleo-L152RE](https://developer.mbed.org/platforms/ST-Nucleo-L152RE/)
-* 6x [Semtech SX1276MB1xAS](https://developer.mbed.org/components/SX1276MB1xAS/)
-* 2x [Seed Grove Shield V2](https://developer.mbed.org/components/Seeed-Grove-Shield-V2/)
+* 10x [Nucleo-L152RE](https://developer.mbed.org/platforms/ST-Nucleo-L152RE/)
+* 10x [Semtech SX1276MB1xAS](https://developer.mbed.org/components/SX1276MB1xAS/)
+* 10x [Seed Grove Shield V2](https://developer.mbed.org/components/Seeed-Grove-Shield-V2/)
 
 # 1. Acquire knowledge about LoRa
 
@@ -289,9 +289,20 @@ For the Nucleo-L152RE, create a file "hal.cpp" with the following contents:
 	    while( 1 );
 	}
 
+Now try compiling again. It should compile.
+
 ## main.cpp
 
-Now let's improve main.cpp. It looks confusing at first if you are unfamiliar with LMiC. Here it is:
+Now let's improve main.cpp. It looks confusing at first if you are unfamiliar with LMiC.
+
+For node managment we are going to use
+[The Things Network's `ttnctl`](https://staging.thethingsnetwork.org/wiki/Backend/ttnctl/QuickStart) tool.
+Follow the instructions on that wiki page.
+
+We are going to configure the device with
+[Over-the-Air-Activation (OTAA)](https://staging.thethingsnetwork.org/wiki/Backend/ttnctl/QuickStart#quick-start-guide-for-ttnctl_device-management).
+
+Here is a sample code:
 
 	#include "mbed.h"
 	#include "lmic.h"
