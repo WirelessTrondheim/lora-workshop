@@ -507,6 +507,3 @@ Inspect the data using a cli MQTT client:
 You should see JSON objects where one of the properties is named `payload`. The payload contains the base64 encoded message.
 Decode it with `echo SGVpIHZlcmRlbg== | base64 -d`.
 
-A hacky way to print out the message directly can be done with:
-
-	mosquitto_sub -h staging.thethingsnetwork.org -P "hki96WIXS1oMnj0D8109A/ug791ywNuQemOGZfoqpRU=" -u 70B3D57ED000019F -t "+/devices/#" | php -r "print base64_decode(json_decode(file_get_contents('php://stdin'), true)['payload']) . PHP_EOL;"
