@@ -305,76 +305,199 @@ We are going to configure the device with
 Here is a sample code:
 
 	#include "mbed.h"
+	
 	#include "lmic.h"
-	 
-	#define LORAWAN_NET_ID (uint32_t) 0x00000000
-	// TODO: enter device address below, for TTN just set ???
-	#define LORAWAN_DEV_ADDR (uint32_t) 0x5A480000
-	#define LORAWAN_ADR_ON 1
-	#define LORAWAN_CONFIRMED_MSG_ON 1
-	#define LORAWAN_APP_PORT 3//15
-	 
-	static uint8_t NwkSKey[] = {
-	    // TODO: enter network, or use TTN default
-	    // e.g. for 2B7E151628AED2A6ABF7158809CF4F3C =>
-	    0x2B, 0x7E, 0x15, 0x16, 0x28, 0xAE, 0xD2, 0xA6, 
-	    0xAB, 0xF7, 0x15, 0x88, 0x09, 0xCF, 0x4F, 0x3C
+	#include "debug.h"
+	
+	#define OVER_THE_AIR_ACTIVATION                     1
+	
+	#define APP_TX_DUTYCYCLE                            5000 // 5 [s] value in ms
+	#define APP_TX_DUTYCYCLE_RND                        1000 // 1 [s] value in ms
+	#define LORAWAN_ADR_ON                              1
+	#define LORAWAN_CONFIRMED_MSG_ON                    1
+	#define LORAWAN_APP_PORT                            15
+	#define LORAWAN_APP_DATA_SIZE                       10
+	
+	static const uint8_t AppEui[8] =
+	{
+	    0x9F, 0x01, 0x00, 0xD0, 0x7E, 0xD5, 0xB3, 0x70
 	};
-	 
-	static uint8_t ArtSKey[] = {
-	    // TODO: enter application key, or use TTN default
-	    // e.g. for 2B7E151628AED2A6ABF7158809CF4F3C =>
-	    0x2B, 0x7E, 0x15, 0x16, 0x28, 0xAE, 0xD2, 0xA6, 
-	    0xAB, 0xF7, 0x15, 0x88, 0x09, 0xCF, 0x4F, 0x3C
+	
+	static const u1_t DevEui[8] =
+	{
+	    0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01
 	};
-	 
-	osjob_t initjob;
+	
+	// device-specific AES key (derived from device EUI)
+	static const uint8_t DevKey[16] = 
+	{
+	    0xBD, 0x51, 0x15, 0x4C, 0xF2, 0xB5, 0xD8, 0x3F, 0xE5, 0xF4, 0xBA, 0x09, 0xFE, 0x14, 0x85, 0x11
+	};
+	
+	// LEDs and Frame jobs
+	osjob_t rxLedJob;
+	osjob_t txLedJob;
 	osjob_t sendFrameJob;
-	u1_t n = 0;
-	 
-	void os_getArtEui (uint8_t *buf) {} // ignore
-	void os_getDevEui (uint8_t *buf) {} // ignore
-	void os_getDevKey (uint8_t *buf) {} // ignore
-	 
-	void onSendFrame (osjob_t* j) {
-	    const char* message = "Hello LoRa"; // ASCII only
-	    int frameLength = strlen(message); // keep it < 32
-	    for (int i = 0; i < frameLength; i++) {
-	        LMIC.frame[i] = message[i];
+	
+	// LED state
+	static bool AppLedStateOn = false;
+	
+	int32_t randr( int32_t min, int32_t max )
+	{
+	    return ( int32_t )rand( ) % ( max - min + 1 ) + min;
+	}
+	
+	void os_getArtEui( uint8_t *buf )
+	{
+	    memcpy( buf, AppEui, 8 );
+	}
+	
+	void os_getDevEui( uint8_t *buf )
+	{
+	    memcpy( buf, DevEui, 8 );
+	}
+	
+	void os_getDevKey( uint8_t *buf )
+	{
+	    memcpy( buf, DevKey, 16 );
+	}
+	
+	static void onRxLed( osjob_t* j )
+	{
+	    debug_val("LED2 = ", 0 );
+	}
+	
+	static void onTxLed( osjob_t* j )
+	{
+	    debug_val("LED1 = ", 0 );
+	}
+	
+	static void prepareTxFrame( void )
+	{
+	    LMIC.frame[0] = 'H';
+	    LMIC.frame[1] = 'e';
+	    LMIC.frame[2] = 'i';
+	    LMIC.frame[3] = ' ';
+	    LMIC.frame[4] = 'v';
+	    LMIC.frame[5] = 'e';
+	    LMIC.frame[6] = 'r';
+	    LMIC.frame[7] = 'd';
+	    LMIC.frame[8] = 'e';
+	    LMIC.frame[9] = 'n';
+	}
+	
+	void processRxFrame( void )
+	{
+	    switch( LMIC.frame[LMIC.dataBeg - 1] ) // Check Rx port number
+	    {
+	        case 1: // The application LED can be controlled on port 1 or 2
+	        case 2:
+	            if( LMIC.dataLen == 1 )
+	            {
+	                AppLedStateOn = LMIC.frame[LMIC.dataBeg] & 0x01;
+	                debug_val( "LED3 = ", AppLedStateOn );
+	            }
+	            break;
+	        default:
+	            break;
 	    }
-	    int result = LMIC_setTxData2(LORAWAN_APP_PORT, LMIC.frame, 
-	        frameLength, LORAWAN_CONFIRMED_MSG_ON); // calls onEvent()
 	}
-	 
-	void onInit (osjob_t* j) {
-	    LMIC_reset();
-	    LMIC_setAdrMode(LORAWAN_ADR_ON);
-	    LMIC_setDrTxpow(DR_SF12, 14);
-	    LMIC_setSession(LORAWAN_NET_ID, LORAWAN_DEV_ADDR, NwkSKey, ArtSKey);
-	    onSendFrame(NULL);
+	
+	static void onSendFrame( osjob_t* j )
+	{
+	    prepareTxFrame( );
+	    LMIC_setTxData2( LORAWAN_APP_PORT, LMIC.frame, LORAWAN_APP_DATA_SIZE, LORAWAN_CONFIRMED_MSG_ON );
+	
+	    // Blink Tx LED
+	    debug_val( "LED1 = ", 1 );
+	    os_setTimedCallback( &txLedJob, os_getTime( ) + ms2osticks( 25 ), onTxLed );
 	}
-	 
-	void onEvent (ev_t ev) { // called by lmic.cpp, see also oslmic.h
-	    //debug_event(ev);
-	    if (ev == EV_TXCOMPLETE) {
-	        os_setCallback(&sendFrameJob, onSendFrame);
+	
+	// Initialization job
+	static void onInit( osjob_t* j )
+	{
+	    // reset MAC state
+	    LMIC_reset( );
+	    LMIC_setAdrMode( LORAWAN_ADR_ON );
+	#if defined(CFG_eu868)
+	    LMIC_setDrTxpow( DR_SF12, 14 );
+	#elif defined(CFG_us915)    
+	    LMIC_setDrTxpow( DR_SF10, 14 );
+	#endif
+	
+	    // start joining
+	#if( OVER_THE_AIR_ACTIVATION != 0 )
+	    LMIC_startJoining( );
+	#else
+	    LMIC_setSession( LORAWAN_NET_ID, LORAWAN_DEV_ADDR, NwkSKey, ArtSKey );
+	    onSendFrame( NULL );
+	#endif
+	    // init done - onEvent( ) callback will be invoked...
+	}
+	
+	int main( void )
+	{
+	    osjob_t initjob;
+	
+	    // initialize runtime env
+	    os_init( );
+	    // setup initial job
+	    os_setCallback( &initjob, onInit );
+	    // execute scheduled jobs and events
+	    os_runloop( );
+	    // (not reached)
+	}
+	
+	void onEvent( ev_t ev )
+	{
+	    bool txOn = false;
+	    debug_event( ev );
+	
+	    switch( ev ) 
+	    {
+	    // network joined, session established
+	    case EV_JOINED:
+	        debug_val( "Net ID = ", LMIC.netid );
+	        txOn = true;
+	        break;
+	    // scheduled data sent (optionally data received)
+	    case EV_TXCOMPLETE:
+	        debug_val( "Datarate = ", LMIC.datarate );
+	        // Check if we have a downlink on either Rx1 or Rx2 windows
+	        if( ( LMIC.txrxFlags & ( TXRX_DNW1 | TXRX_DNW2 ) ) != 0 )
+	        {
+	            debug_val( "LED2 = ", 1 );
+	            os_setTimedCallback( &rxLedJob, os_getTime( ) + ms2osticks( 25 ), onRxLed );
+	
+	            if( LMIC.dataLen != 0 )
+	            { // data received in rx slot after tx
+	                debug_buf( LMIC.frame + LMIC.dataBeg, LMIC.dataLen );
+	                processRxFrame( );
+	            }
+	        }
+	        txOn = true;
+	        break;
+	    default:
+	        break;
+	    }
+	    if( txOn == true )
+	    {
+	        //Sends frame every APP_TX_DUTYCYCLE +/- APP_TX_DUTYCYCLE_RND random time (if not duty cycle limited)
+	        os_setTimedCallback( &sendFrameJob,
+	                             os_getTime( ) + ms2osticks( APP_TX_DUTYCYCLE + randr( -APP_TX_DUTYCYCLE_RND, APP_TX_DUTYCYCLE_RND ) ),
+	                             onSendFrame );
+	        
+	        ////Sends frame as soon as possible (duty cylce limitations)
+	        //onSendFrame( NULL );
 	    }
 	}
-	 
-	int main (void) {
-	    printf("main\r\n");
-	    os_init();
-	    os_setCallback(&initjob, onInit);
-	    os_runloop(); // blocking
-	}
 
-The network key and application keys are good. They are used by The Things Network.
-
-One change you need to do is set the LORAWAN\_DEV\_ADDR. This is the device address of the node
-that is communicating with the network. Its purpose is similar to MAC addresses in Ethernet.
-
-Hit the compile button and flash the Nucleo.
+**NOTE:** The AppEUI and DevEUI need to be reversed from the printout with `ttnctl` due to endianness.
 
 # 6. Did our data arrive?
 
-Inspect the HTTP API and look for your data. 
+Inspect the data using a cli MQTT client:
+
+	mosquitto_sub -h staging.thethingsnetwork.org -P "hki96WIXS1oMnj0D8109A/ug791ywNuQemOGZfoqpRU=" -u 70B3D57ED000019F -t "+/devices/#"
+
+`-P` is the access key and -u is the AppEui.
