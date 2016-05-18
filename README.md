@@ -1,3 +1,4 @@
+<!--
 <head>
 </head>
 
@@ -12,6 +13,7 @@
         margin: 0 0 20px;
     }
 </style>
+-->
 
 
 # Hands-on LoRa workshop
