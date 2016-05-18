@@ -1,0 +1,132 @@
+[
+  {
+    "id": "f58e9a26.d5e628",
+    "type": "mqtt-broker",
+    "z": "e4c24568.84a368",
+    "broker": "staging.thethingsnetwork.org",
+    "port": "1883",
+    "clientid": "",
+    "usetls": false,
+    "verifyservercert": true,
+    "compatmode": true,
+    "keepalive": "60",
+    "cleansession": true,
+    "willTopic": "",
+    "willQos": "0",
+    "willRetain": null,
+    "willPayload": "",
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthRetain": null,
+    "birthPayload": ""
+  },
+  {
+    "id": "7f0220dc.fddf68",
+    "type": "mqtt in",
+    "z": "e4c24568.84a368",
+    "name": "",
+    "topic": "+\/devices\/+\/up",
+    "broker": "f58e9a26.d5e628",
+    "x": 182,
+    "y": 109,
+    "wires": [
+      [
+        "b8d7bd85.2476c8"
+      ]
+    ]
+  },
+  {
+    "id": "dfb461ac.0a64e8",
+    "type": "debug",
+    "z": "e4c24568.84a368",
+    "name": "",
+    "active": true,
+    "console": "false",
+    "complete": "payload",
+    "x": 754,
+    "y": 110,
+    "wires": [
+      
+    ]
+  },
+  {
+    "id": "b8d7bd85.2476c8",
+    "type": "json",
+    "z": "e4c24568.84a368",
+    "name": "",
+    "x": 367,
+    "y": 109,
+    "wires": [
+      [
+        "6ecd4195.44ba8"
+      ]
+    ]
+  },
+  {
+    "id": "6ecd4195.44ba8",
+    "type": "function",
+    "z": "e4c24568.84a368",
+    "name": "",
+    "func": "msg.payload = new Buffer(msg.payload.payload, \"base64\").toString();\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 531,
+    "y": 109,
+    "wires": [
+      [
+        "dfb461ac.0a64e8"
+      ]
+    ]
+  },
+  {
+    "id": "5836d5e1.2046dc",
+    "type": "inject",
+    "z": "e4c24568.84a368",
+    "name": "",
+    "topic": "<AppEUI>\/devices\/<DevEUI>\/down",
+    "payload": "hello node",
+    "payloadType": "str",
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "x": 215,
+    "y": 286,
+    "wires": [
+      [
+        "ec45fdbf.58cce8"
+      ]
+    ]
+  },
+  {
+    "id": "706bf5f0.9c7aec",
+    "type": "mqtt out",
+    "z": "e4c24568.84a368",
+    "name": "",
+    "topic": "",
+    "qos": "0",
+    "retain": "false",
+    "broker": "f58e9a26.d5e628",
+    "x": 744,
+    "y": 288,
+    "wires": [
+      
+    ]
+  },
+  {
+    "id": "ec45fdbf.58cce8",
+    "type": "function",
+    "z": "e4c24568.84a368",
+    "name": "",
+    "func": "data = new Buffer(msg.payload).toString(\"base64\");\nmsg.payload = {payload:data, ttl:\"1h\", port:1};\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 426,
+    "y": 287,
+    "wires": [
+      [
+        "706bf5f0.9c7aec"
+      ]
+    ]
+  }
+]
+
