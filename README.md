@@ -126,6 +126,13 @@ is IBM's implementation of the LoRaWAN protocol. Its API can be found in the
 
 Semtech/SX1276Lib is a driver for the SX1276 RF transceiver.
 
+We will also need to configure LMiC to use European frequencies. Open the file lmic.h in the LMiC library
+and make sure you set the configuration like this:
+
+    // MBED compiler options
+    #define CFG_eu868                                   1
+    //#define CFG_us915                                   1
+
 After importing those two libraries, you could try to compile. You will discover some compile errors:
 
     Error: Undefined symbol hal\_failed() (referred from lmic.cpp.NUCLEO\_L152RE.o).
