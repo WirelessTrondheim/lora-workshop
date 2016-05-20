@@ -232,193 +232,146 @@ We are going to configure the device with
 
 Here is a sample code:
 
-	#include "mbed.h"
-	
-	#include "lmic.h"
-	#include "debug.h"
-	
-	#define OVER_THE_AIR_ACTIVATION                     1
-	
-	#define APP_TX_DUTYCYCLE                            5000 // 5 [s] value in ms
-	#define APP_TX_DUTYCYCLE_RND                        1000 // 1 [s] value in ms
-	#define LORAWAN_ADR_ON                              1
-	#define LORAWAN_CONFIRMED_MSG_ON                    1
-	#define LORAWAN_APP_PORT                            15
-	#define LORAWAN_APP_DATA_SIZE                       10
-	
-	static const uint8_t AppEui[8] =
-	{
-	    0x9F, 0x01, 0x00, 0xD0, 0x7E, 0xD5, 0xB3, 0x70
-	};
-	
-	static const u1_t DevEui[8] =
-	{
-	    0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01
-	};
-	
-	// device-specific AES key (derived from device EUI)
-	static const uint8_t DevKey[16] = 
-	{
-	    0xBD, 0x51, 0x15, 0x4C, 0xF2, 0xB5, 0xD8, 0x3F, 0xE5, 0xF4, 0xBA, 0x09, 0xFE, 0x14, 0x85, 0x11
-	};
-	
-	// LEDs and Frame jobs
-	osjob_t rxLedJob;
-	osjob_t txLedJob;
-	osjob_t sendFrameJob;
-	
-	// LED state
-	static bool AppLedStateOn = false;
-	
-	int32_t randr( int32_t min, int32_t max )
-	{
-	    return ( int32_t )rand( ) % ( max - min + 1 ) + min;
-	}
-	
-	void os_getArtEui( uint8_t *buf )
-	{
-	    memcpy( buf, AppEui, 8 );
-	}
-	
-	void os_getDevEui( uint8_t *buf )
-	{
-	    memcpy( buf, DevEui, 8 );
-	}
-	
-	void os_getDevKey( uint8_t *buf )
-	{
-	    memcpy( buf, DevKey, 16 );
-	}
-	
-	static void onRxLed( osjob_t* j )
-	{
-	    debug_val("LED2 = ", 0 );
-	}
-	
-	static void onTxLed( osjob_t* j )
-	{
-	    debug_val("LED1 = ", 0 );
-	}
-	
-	static void prepareTxFrame( void )
-	{
-	    LMIC.frame[0] = 'H';
-	    LMIC.frame[1] = 'e';
-	    LMIC.frame[2] = 'i';
-	    LMIC.frame[3] = ' ';
-	    LMIC.frame[4] = 'v';
-	    LMIC.frame[5] = 'e';
-	    LMIC.frame[6] = 'r';
-	    LMIC.frame[7] = 'd';
-	    LMIC.frame[8] = 'e';
-	    LMIC.frame[9] = 'n';
-	}
-	
-	void processRxFrame( void )
-	{
-	    switch( LMIC.frame[LMIC.dataBeg - 1] ) // Check Rx port number
-	    {
-	        case 1: // The application LED can be controlled on port 1 or 2
-	        case 2:
-	            if( LMIC.dataLen == 1 )
-	            {
-	                AppLedStateOn = LMIC.frame[LMIC.dataBeg] & 0x01;
-	                debug_val( "LED3 = ", AppLedStateOn );
-	            }
-	            break;
-	        default:
-	            break;
-	    }
-	}
-	
-	static void onSendFrame( osjob_t* j )
-	{
-	    prepareTxFrame( );
-	    LMIC_setTxData2( LORAWAN_APP_PORT, LMIC.frame, LORAWAN_APP_DATA_SIZE, LORAWAN_CONFIRMED_MSG_ON );
-	
-	    // Blink Tx LED
-	    debug_val( "LED1 = ", 1 );
-	    os_setTimedCallback( &txLedJob, os_getTime( ) + ms2osticks( 25 ), onTxLed );
-	}
-	
-	// Initialization job
-	static void onInit( osjob_t* j )
-	{
-	    // reset MAC state
-	    LMIC_reset( );
-	    LMIC_setAdrMode( LORAWAN_ADR_ON );
-	#if defined(CFG_eu868)
-	    LMIC_setDrTxpow( DR_SF12, 14 );
-	#elif defined(CFG_us915)    
-	    LMIC_setDrTxpow( DR_SF10, 14 );
-	#endif
-	
-	    // start joining
-	#if( OVER_THE_AIR_ACTIVATION != 0 )
-	    LMIC_startJoining( );
-	#else
-	    LMIC_setSession( LORAWAN_NET_ID, LORAWAN_DEV_ADDR, NwkSKey, ArtSKey );
-	    onSendFrame( NULL );
-	#endif
-	    // init done - onEvent( ) callback will be invoked...
-	}
-	
-	int main( void )
-	{
-	    osjob_t initjob;
-	
-	    // initialize runtime env
-	    os_init( );
-	    // setup initial job
-	    os_setCallback( &initjob, onInit );
-	    // execute scheduled jobs and events
-	    os_runloop( );
-	    // (not reached)
-	}
-	
-	void onEvent( ev_t ev )
-	{
-	    bool txOn = false;
-	    debug_event( ev );
-	
-	    switch( ev ) 
-	    {
-	    // network joined, session established
-	    case EV_JOINED:
-	        debug_val( "Net ID = ", LMIC.netid );
-	        txOn = true;
-	        break;
-	    // scheduled data sent (optionally data received)
-	    case EV_TXCOMPLETE:
-	        debug_val( "Datarate = ", LMIC.datarate );
-	        // Check if we have a downlink on either Rx1 or Rx2 windows
-	        if( ( LMIC.txrxFlags & ( TXRX_DNW1 | TXRX_DNW2 ) ) != 0 )
-	        {
-	            debug_val( "LED2 = ", 1 );
-	            os_setTimedCallback( &rxLedJob, os_getTime( ) + ms2osticks( 25 ), onRxLed );
-	
-	            if( LMIC.dataLen != 0 )
-	            { // data received in rx slot after tx
-	                debug_buf( LMIC.frame + LMIC.dataBeg, LMIC.dataLen );
-	                processRxFrame( );
-	            }
-	        }
-	        txOn = true;
-	        break;
-	    default:
-	        break;
-	    }
-	    if( txOn == true )
-	    {
-	        //Sends frame every APP_TX_DUTYCYCLE +/- APP_TX_DUTYCYCLE_RND random time (if not duty cycle limited)
-	        os_setTimedCallback( &sendFrameJob,
-	                             os_getTime( ) + ms2osticks( APP_TX_DUTYCYCLE + randr( -APP_TX_DUTYCYCLE_RND, APP_TX_DUTYCYCLE_RND ) ),
-	                             onSendFrame );
-	        
-	        ////Sends frame as soon as possible (duty cylce limitations)
-	        //onSendFrame( NULL );
-	    }
-	}
+    #include "mbed.h"
+    
+    #include "lmic.h"
+    
+    #define APP_TX_DUTYCYCLE                            5000 // 5 [s] value in ms
+    #define APP_TX_DUTYCYCLE_RND                        1000 // 1 [s] value in ms
+    
+    static const uint8_t AppEui[8] =
+    {
+        0x9F, 0x01, 0x00, 0xD0, 0x7E, 0xD5, 0xB3, 0x70
+    };
+    
+    static const u1_t DevEui[8] =
+    {
+        0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01
+    };
+    
+    // device-specific AES key (derived from device EUI)
+    static const uint8_t DevKey[16] = 
+    {
+        0xBD, 0x51, 0x15, 0x4C, 0xF2, 0xB5, 0xD8, 0x3F, 0xE5, 0xF4, 0xBA, 0x09, 0xFE, 0x14, 0x85, 0x11
+    };
+    
+    osjob_t sendFrameJob;
+    
+    int32_t randr(int32_t min, int32_t max)
+    {
+        return (int32_t)rand() % (max - min + 1) + min;
+    }
+    
+    void os_getArtEui(uint8_t *buf)
+    {
+        memcpy(buf, AppEui, 8);
+    }
+    
+    void os_getDevEui(uint8_t *buf)
+    {
+        memcpy(buf, DevEui, 8);
+    }
+    
+    void os_getDevKey(uint8_t *buf)
+    {
+        memcpy(buf, DevKey, 16);
+    }
+    
+    static void onSendFrame(osjob_t* j)
+    {
+        printf("Sending frame...\n\r");
+        LMIC.frame[0] = 'H';
+        LMIC.frame[1] = 'e';
+        LMIC.frame[2] = 'i';
+        LMIC.frame[3] = ' ';
+        LMIC.frame[4] = 'v';
+        LMIC.frame[5] = 'e';
+        LMIC.frame[6] = 'r';
+        LMIC.frame[7] = 'd';
+        LMIC.frame[8] = 'e';
+        LMIC.frame[9] = 'n';
+        LMIC_setTxData2(15, LMIC.frame, 10, 0);
+    }
+    
+    // Initialization job
+    static void onInit(osjob_t* j)
+    {
+        // reset MAC state
+        LMIC_reset();
+        LMIC_setDrTxpow(DR_SF12, 14);
+    
+        // start joining
+        LMIC_startJoining();
+        // init done - onEvent() callback will be invoked...
+        
+        printf("JOINING\n\r");
+    }
+    
+    int main(void)
+    {
+        osjob_t initjob;
+    
+        // initialize runtime env
+        os_init();
+        // setup initial job
+        os_setCallback(&initjob, onInit);
+        // execute scheduled jobs and events
+        os_runloop();
+        // (not reached)
+    }
+    
+    void print_buf(const u1_t* frame, u2_t len)
+    {
+        for (u2_t i = 0; i < len; i++)
+        {
+            if (frame[i] >= ' ' && frame[i] <= 0x7e)
+                printf("%c", frame[i]);
+            else
+                printf("\\x%02X", frame[i]);
+        }
+        printf("\n\r");
+    }
+    
+    void onEvent(ev_t ev)
+    {
+        bool txOn = false;
+    
+        switch(ev)
+        {
+        // network joined, session established
+        case EV_JOINED:
+            printf("JOINED\n\r");
+            // Link check is currently not implemented for TTN, so just disable it
+            LMIC_setLinkCheckMode(0);
+            txOn = true;
+            break;
+        // scheduled data sent (optionally data received)
+        case EV_TXCOMPLETE:
+            printf("TXCOMPLETE\n\r");
+            if((LMIC.txrxFlags & (TXRX_DNW1 | TXRX_DNW2)) != 0)
+            {
+                if(LMIC.dataLen != 0)
+                { // data received in rx slot after tx
+                    printf("Received frame: ");
+                    print_buf(LMIC.frame + LMIC.dataBeg, LMIC.dataLen);
+                }
+            }
+            txOn = true;
+            break;
+        default:
+            break;
+        }
+        if(txOn == true)
+        {
+            //Sends frame every APP_TX_DUTYCYCLE +/- APP_TX_DUTYCYCLE_RND random time (if not duty cycle limited)
+            os_setTimedCallback(&sendFrameJob,
+                                os_getTime() + ms2osticks(APP_TX_DUTYCYCLE + randr(-APP_TX_DUTYCYCLE_RND, APP_TX_DUTYCYCLE_RND)),
+                                onSendFrame);
+    
+            ////Sends frame as soon as possible (duty cylce limitations)
+            //onSendFrame(NULL);
+        }
+    }
 
 **NOTE:** The AppEUI and DevEUI need to be reversed from the printout with `ttnctl` due to endianness.
 
