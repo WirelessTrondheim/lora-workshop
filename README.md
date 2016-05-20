@@ -50,7 +50,7 @@ If you are sufficiently adventurous you can also skim the
 **NOTE: I had to whitelist the webpage in my ad-blocker to avoid visual bugs.**
 
 To produce binaries for hardware, we use the
-[ARM embed platform](https://developer.mbed.org/).
+[ARM mbed platform](https://developer.mbed.org/).
 
 It is a convenient web-based platform. First you write your C code in the browser and
 it is compiled on ARM's servers. Next the binary is downloaded to
@@ -113,7 +113,7 @@ the Nucleo. Like this:
 
 ![](images/prototype.jpg)
 
-Also attach the radio antenna to ANT_\HF.
+Also attach the radio antenna to ANT_HF.
 
 To compile a lora application we need to import two libraries:
 
@@ -224,14 +224,14 @@ For the Nucleo-L152RE, create a file "hal.cpp" with the following contents:
         while( 1 );
     }
 
-Now try compiling again. And you should now see compiler error like these:
+Now try compiling again. And you should now see compiler errors like these:
 
     Error: Undefined symbol os_getArtEui(unsigned char*) (referred from lmic.cpp.NUCLEO_L152RE.o).
     Error: Undefined symbol os_getDevEui(unsigned char*) (referred from lmic.cpp.NUCLEO_L152RE.o).
     Error: Undefined symbol os_getDevKey(unsigned char*) (referred from lmic.cpp.NUCLEO_L152RE.o).
     Error: Undefined symbol onEvent(_ev_t) (referred from lmic.cpp.NUCLEO_L152RE.o).
 
-One of these missing symbols are the onEvent function that is the main event loop we need to implement.
+One of these missing symbols are the onEvent function which is the main event loop we need to implement.
 
 ## main.cpp
 
