@@ -135,14 +135,14 @@ and make sure you set the configuration like this:
 
 After importing those two libraries, you could try to compile. You will discover some compile errors:
 
-    Error: Undefined symbol hal\_failed() (referred from lmic.cpp.NUCLEO\_L152RE.o).
-    Error: Undefined symbol hal\_checkTimer(unsigned) (referred from oslmic.cpp.NUCLEO_L152RE.o).
-    Error: Undefined symbol hal\_enableIRQs() (referred from oslmic.cpp.NUCLEO_L152RE.o).
-    Error: Undefined symbol hal\_disableIRQs() (referred from oslmic.cpp.NUCLEO_L152RE.o).
-    Error: Undefined symbol hal\_init() (referred from oslmic.cpp.NUCLEO_L152RE.o).
-    Error: Undefined symbol hal\_sleep() (referred from oslmic.cpp.NUCLEO_L152RE.o).
-    Error: Undefined symbol hal\_ticks() (referred from oslmic.cpp.NUCLEO_L152RE.o).
-    Error: Undefined symbol hal\_waitUntil(unsigned) (referred from radio.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol hal_failed() (referred from lmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol hal_checkTimer(unsigned) (referred from oslmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol hal_enableIRQs() (referred from oslmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol hal_disableIRQs() (referred from oslmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol hal_init() (referred from oslmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol hal_sleep() (referred from oslmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol hal_ticks() (referred from oslmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol hal_waitUntil(unsigned) (referred from radio.cpp.NUCLEO_L152RE.o).
 
 The LMiC library is separated into a large portion of portable code and a small platform-specific part.
 By implementing the functions of this hardware abstraction layer with the specified semantics, the
@@ -224,7 +224,14 @@ For the Nucleo-L152RE, create a file "hal.cpp" with the following contents:
         while( 1 );
     }
 
-Now try compiling again. It should compile.
+Now try compiling again. And you should now see compiler error like these:
+
+    Error: Undefined symbol os_getArtEui(unsigned char*) (referred from lmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol os_getDevEui(unsigned char*) (referred from lmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol os_getDevKey(unsigned char*) (referred from lmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol onEvent(_ev_t) (referred from lmic.cpp.NUCLEO_L152RE.o).
+
+One of these missing symbols are the onEvent function that is the main event loop we need to implement.
 
 ## main.cpp
 
@@ -393,3 +400,4 @@ Inspect the data using a cli MQTT client:
 You should see JSON objects where one of the properties is named `payload`. The payload contains the base64 encoded message.
 Decode it with `echo SGVpIHZlcmRlbg== | base64 -d`.
 
+This data can also easily be inspected with e.g. python and Node-RED. See [mqtt_tools](mqtt_tools) for examples.
