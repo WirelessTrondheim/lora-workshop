@@ -34,7 +34,6 @@ We bring the hardware:
 
 * 10x [Nucleo-L152RE](https://developer.mbed.org/platforms/ST-Nucleo-L152RE/)
 * 10x [Semtech SX1276MB1xAS](https://developer.mbed.org/components/SX1276MB1xAS/)
-* 10x [Seed Grove Shield V2](https://developer.mbed.org/components/Seeed-Grove-Shield-V2/)
 
 # 1. Acquire knowledge about LoRa
 
@@ -108,10 +107,11 @@ It should print out "hello world" each second.
 
 # 5. Hello LoRa!
 
-Now we are gonna attach the Seed Grove Shield V2 and Semtech SX1276MB1xAS onto
+Now we are gonna attach the Semtech SX1276MB1xAS onto
 the Nucleo. Like this:
 
 ![](images/prototype.jpg)
+*The image includes a shield, which is not strictly necessary unless you need to interface with other stuff.*
 
 Also attach the radio antenna to ANT_\HF.
 
