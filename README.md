@@ -49,7 +49,7 @@ If you are sufficiently adventurous you can also skim the
 **NOTE: I had to whitelist the webpage in my ad-blocker to avoid visual bugs.**
 
 To produce binaries for hardware, we use the
-[ARM embed platform](https://developer.mbed.org/).
+[ARM mbed platform](https://developer.mbed.org/).
 
 It is a convenient web-based platform. First you write your C code in the browser and
 it is compiled on ARM's servers. Next the binary is downloaded to
@@ -113,7 +113,7 @@ the Nucleo. Like this:
 ![](images/prototype.jpg)
 *The image includes a shield, which is not strictly necessary unless you need to interface with other stuff.*
 
-Also attach the radio antenna to ANT_\HF.
+Also attach the radio antenna to ANT_HF.
 
 To compile a lora application we need to import two libraries:
 
@@ -126,16 +126,23 @@ is IBM's implementation of the LoRaWAN protocol. Its API can be found in the
 
 Semtech/SX1276Lib is a driver for the SX1276 RF transceiver.
 
+We will also need to configure LMiC to use European frequencies. Open the file lmic.h in the LMiC library
+and make sure you set the configuration like this:
+
+    // MBED compiler options
+    #define CFG_eu868                                   1
+    //#define CFG_us915                                   1
+
 After importing those two libraries, you could try to compile. You will discover some compile errors:
 
-    Error: Undefined symbol hal\_failed() (referred from lmic.cpp.NUCLEO\_L152RE.o).
-    Error: Undefined symbol hal\_checkTimer(unsigned) (referred from oslmic.cpp.NUCLEO_L152RE.o).
-    Error: Undefined symbol hal\_enableIRQs() (referred from oslmic.cpp.NUCLEO_L152RE.o).
-    Error: Undefined symbol hal\_disableIRQs() (referred from oslmic.cpp.NUCLEO_L152RE.o).
-    Error: Undefined symbol hal\_init() (referred from oslmic.cpp.NUCLEO_L152RE.o).
-    Error: Undefined symbol hal\_sleep() (referred from oslmic.cpp.NUCLEO_L152RE.o).
-    Error: Undefined symbol hal\_ticks() (referred from oslmic.cpp.NUCLEO_L152RE.o).
-    Error: Undefined symbol hal\_waitUntil(unsigned) (referred from radio.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol hal_failed() (referred from lmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol hal_checkTimer(unsigned) (referred from oslmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol hal_enableIRQs() (referred from oslmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol hal_disableIRQs() (referred from oslmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol hal_init() (referred from oslmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol hal_sleep() (referred from oslmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol hal_ticks() (referred from oslmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol hal_waitUntil(unsigned) (referred from radio.cpp.NUCLEO_L152RE.o).
 
 The LMiC library is separated into a large portion of portable code and a small platform-specific part.
 By implementing the functions of this hardware abstraction layer with the specified semantics, the
@@ -145,153 +152,86 @@ For the Nucleo-L152RE, create a file "hal.cpp" with the following contents:
 
 ## hal.cpp
 
-	#include "mbed.h"
-	#include "lmic.h"
-	#include "mbed_debug.h"
-	 
-	#if !USE_SMTC_RADIO_DRIVER
-	 
-	extern void radio_irq_handler( u1_t dio );
-	 
-	static DigitalOut nss( D10 );
-	static SPI spi( D11, D12, D13 ); // ( mosi, miso, sclk )
-	 
-	static DigitalInOut rst( A0 );
-	static DigitalOut rxtx( A4 );
-	 
-	static InterruptIn dio0( D2 );
-	static InterruptIn dio1( D3 );
-	static InterruptIn dio2( D4 ); 
-	 
-	static void dio0Irq( void ) {
-	    radio_irq_handler( 0 );
-	}
-	 
-	static void dio1Irq( void ) {
-	    radio_irq_handler( 1 );
-	}
-	 
-	static void dio2Irq( void ) {
-	    radio_irq_handler( 2 );
-	}
-	 
-	#endif
-	 
-	static u1_t irqlevel = 0;
-	static u4_t ticks = 0;
-	 
-	static Timer timer;
-	static Ticker ticker;
-	 
-	static void reset_timer( void ) {
-	    ticks += timer.read_us( ) >> 6;
-	    timer.reset( );
-	}
-	 
-	void hal_init( void ) {
-	     __disable_irq( );
-	     irqlevel = 0;
-	 
-	#if !USE_SMTC_RADIO_DRIVER
-	    // configure input lines
-	    dio0.mode( PullDown );
-	    dio0.rise( dio0Irq );
-	    dio0.enable_irq( );
-	    dio1.mode( PullDown );   
-	    dio1.rise( dio1Irq );
-	    dio1.enable_irq( );
-	    dio2.mode( PullDown );
-	    dio2.rise( dio2Irq );
-	    dio2.enable_irq( );
-	    // configure reset line
-	    rst.input( );
-	    // configure spi
-	    spi.frequency( 8000000 );
-	    spi.format( 8, 0 );
-	    nss = 1;
-	#endif
-	    // configure timer
-	    timer.start( );
-	    ticker.attach_us( reset_timer, 10000000 ); // reset timer every 10sec
-	     __enable_irq( );
-	}
-	 
-	#if !USE_SMTC_RADIO_DRIVER
-	 
-	void hal_pin_rxtx( u1_t val ) {
-	    rxtx = !val;
-	}
-	 
-	void hal_pin_nss( u1_t val ) {
-	    nss = val;
-	}
-	 
-	void hal_pin_rst( u1_t val ) {
-	    if( val == 0 || val == 1 )
-	    { // drive pin
-	        rst.output( );
-	        rst = val;
-	    } 
-	    else
-	    { // keep pin floating
-	        rst.input( );
-	    }
-	}
-	 
-	u1_t hal_spi( u1_t out ) {
-	    return spi.write( out );
-	}
-	 
-	#endif
-	 
-	void hal_disableIRQs( void ) {
-	    __disable_irq( );
-	    irqlevel++;
-	}
-	 
-	void hal_enableIRQs( void ) {
-	    if( --irqlevel == 0 )
-	    {
-	        __enable_irq( );
-	    }
-	}
-	 
-	void hal_sleep( void ) {
-	    // NOP
-	}
-	 
-	u4_t hal_ticks( void ) {
-	    hal_disableIRQs( );
-	    int t = ticks + ( timer.read_us( ) >> 6 );
-	    hal_enableIRQs( );
-	    return t;
-	}
-	 
-	static u2_t deltaticks( u4_t time ) {
-	    u4_t t = hal_ticks( );
-	    s4_t d = time - t;
-	    if( d <= 0 ) {
-	        return 0;    // in the past
-	    }
-	    if( ( d >> 16 ) != 0 ) {
-	        return 0xFFFF; // far ahead
-	    }
-	    return ( u2_t )d;
-	}
-	 
-	void hal_waitUntil( u4_t time ) {
-	    while( deltaticks( time ) != 0 ); // busy wait until timestamp is reached
-	}
-	 
-	u1_t hal_checkTimer( u4_t time ) {
-	    return ( deltaticks( time ) < 2 );
-	}
-	 
-	void hal_failed( void ) {
-	    while( 1 );
-	}
+    #include "mbed.h"
+    #include "lmic.h"
+    #include "mbed_debug.h"
+    
+    static u1_t irqlevel = 0;
+    static u4_t ticks = 0;
+    
+    static Timer timer;
+    static Ticker ticker;
+    
+    static void reset_timer( void ) {
+        ticks += timer.read_us( ) >> 6;
+        timer.reset( );
+    }
+    
+    void hal_init( void ) {
+         __disable_irq( );
+         irqlevel = 0;
+    
+        // configure timer
+        timer.start( );
+        ticker.attach_us( reset_timer, 10000000 ); // reset timer every 10sec
+         __enable_irq( );
+    }
+    
+    void hal_disableIRQs( void ) {
+        __disable_irq( );
+        irqlevel++;
+    }
+    
+    void hal_enableIRQs( void ) {
+        if( --irqlevel == 0 )
+        {
+            __enable_irq( );
+        }
+    }
+    
+    void hal_sleep( void ) {
+        // NOP
+    }
+    
+    u4_t hal_ticks( void ) {
+        hal_disableIRQs( );
+        int t = ticks + ( timer.read_us( ) >> 6 );
+        hal_enableIRQs( );
+        return t;
+    }
+    
+    static u2_t deltaticks( u4_t time ) {
+        u4_t t = hal_ticks( );
+        s4_t d = time - t;
+        if( d <= 0 ) {
+            return 0;    // in the past
+        }
+        if( ( d >> 16 ) != 0 ) {
+            return 0xFFFF; // far ahead
+        }
+        return ( u2_t )d;
+    }
+    
+    void hal_waitUntil( u4_t time ) {
+        while( deltaticks( time ) != 0 ); // busy wait until timestamp is reached
+    }
+    
+    u1_t hal_checkTimer( u4_t time ) {
+        return ( deltaticks( time ) < 2 );
+    }
+    
+    void hal_failed( void ) {
+        while( 1 );
+    }
 
-Now try compiling again. It should compile.
+Now try compiling again. And you should now see compiler errors like these:
+
+    Error: Undefined symbol os_getArtEui(unsigned char*) (referred from lmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol os_getDevEui(unsigned char*) (referred from lmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol os_getDevKey(unsigned char*) (referred from lmic.cpp.NUCLEO_L152RE.o).
+    Error: Undefined symbol onEvent(_ev_t) (referred from lmic.cpp.NUCLEO_L152RE.o).
+
+One of these missing symbols are the onEvent function which is the main event loop we need to implement.
 
 ## main.cpp
 
@@ -306,193 +246,146 @@ We are going to configure the device with
 
 Here is a sample code:
 
-	#include "mbed.h"
-	
-	#include "lmic.h"
-	#include "debug.h"
-	
-	#define OVER_THE_AIR_ACTIVATION                     1
-	
-	#define APP_TX_DUTYCYCLE                            5000 // 5 [s] value in ms
-	#define APP_TX_DUTYCYCLE_RND                        1000 // 1 [s] value in ms
-	#define LORAWAN_ADR_ON                              1
-	#define LORAWAN_CONFIRMED_MSG_ON                    1
-	#define LORAWAN_APP_PORT                            15
-	#define LORAWAN_APP_DATA_SIZE                       10
-	
-	static const uint8_t AppEui[8] =
-	{
-	    0x9F, 0x01, 0x00, 0xD0, 0x7E, 0xD5, 0xB3, 0x70
-	};
-	
-	static const u1_t DevEui[8] =
-	{
-	    0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01
-	};
-	
-	// device-specific AES key (derived from device EUI)
-	static const uint8_t DevKey[16] = 
-	{
-	    0xBD, 0x51, 0x15, 0x4C, 0xF2, 0xB5, 0xD8, 0x3F, 0xE5, 0xF4, 0xBA, 0x09, 0xFE, 0x14, 0x85, 0x11
-	};
-	
-	// LEDs and Frame jobs
-	osjob_t rxLedJob;
-	osjob_t txLedJob;
-	osjob_t sendFrameJob;
-	
-	// LED state
-	static bool AppLedStateOn = false;
-	
-	int32_t randr( int32_t min, int32_t max )
-	{
-	    return ( int32_t )rand( ) % ( max - min + 1 ) + min;
-	}
-	
-	void os_getArtEui( uint8_t *buf )
-	{
-	    memcpy( buf, AppEui, 8 );
-	}
-	
-	void os_getDevEui( uint8_t *buf )
-	{
-	    memcpy( buf, DevEui, 8 );
-	}
-	
-	void os_getDevKey( uint8_t *buf )
-	{
-	    memcpy( buf, DevKey, 16 );
-	}
-	
-	static void onRxLed( osjob_t* j )
-	{
-	    debug_val("LED2 = ", 0 );
-	}
-	
-	static void onTxLed( osjob_t* j )
-	{
-	    debug_val("LED1 = ", 0 );
-	}
-	
-	static void prepareTxFrame( void )
-	{
-	    LMIC.frame[0] = 'H';
-	    LMIC.frame[1] = 'e';
-	    LMIC.frame[2] = 'i';
-	    LMIC.frame[3] = ' ';
-	    LMIC.frame[4] = 'v';
-	    LMIC.frame[5] = 'e';
-	    LMIC.frame[6] = 'r';
-	    LMIC.frame[7] = 'd';
-	    LMIC.frame[8] = 'e';
-	    LMIC.frame[9] = 'n';
-	}
-	
-	void processRxFrame( void )
-	{
-	    switch( LMIC.frame[LMIC.dataBeg - 1] ) // Check Rx port number
-	    {
-	        case 1: // The application LED can be controlled on port 1 or 2
-	        case 2:
-	            if( LMIC.dataLen == 1 )
-	            {
-	                AppLedStateOn = LMIC.frame[LMIC.dataBeg] & 0x01;
-	                debug_val( "LED3 = ", AppLedStateOn );
-	            }
-	            break;
-	        default:
-	            break;
-	    }
-	}
-	
-	static void onSendFrame( osjob_t* j )
-	{
-	    prepareTxFrame( );
-	    LMIC_setTxData2( LORAWAN_APP_PORT, LMIC.frame, LORAWAN_APP_DATA_SIZE, LORAWAN_CONFIRMED_MSG_ON );
-	
-	    // Blink Tx LED
-	    debug_val( "LED1 = ", 1 );
-	    os_setTimedCallback( &txLedJob, os_getTime( ) + ms2osticks( 25 ), onTxLed );
-	}
-	
-	// Initialization job
-	static void onInit( osjob_t* j )
-	{
-	    // reset MAC state
-	    LMIC_reset( );
-	    LMIC_setAdrMode( LORAWAN_ADR_ON );
-	#if defined(CFG_eu868)
-	    LMIC_setDrTxpow( DR_SF12, 14 );
-	#elif defined(CFG_us915)    
-	    LMIC_setDrTxpow( DR_SF10, 14 );
-	#endif
-	
-	    // start joining
-	#if( OVER_THE_AIR_ACTIVATION != 0 )
-	    LMIC_startJoining( );
-	#else
-	    LMIC_setSession( LORAWAN_NET_ID, LORAWAN_DEV_ADDR, NwkSKey, ArtSKey );
-	    onSendFrame( NULL );
-	#endif
-	    // init done - onEvent( ) callback will be invoked...
-	}
-	
-	int main( void )
-	{
-	    osjob_t initjob;
-	
-	    // initialize runtime env
-	    os_init( );
-	    // setup initial job
-	    os_setCallback( &initjob, onInit );
-	    // execute scheduled jobs and events
-	    os_runloop( );
-	    // (not reached)
-	}
-	
-	void onEvent( ev_t ev )
-	{
-	    bool txOn = false;
-	    debug_event( ev );
-	
-	    switch( ev ) 
-	    {
-	    // network joined, session established
-	    case EV_JOINED:
-	        debug_val( "Net ID = ", LMIC.netid );
-	        txOn = true;
-	        break;
-	    // scheduled data sent (optionally data received)
-	    case EV_TXCOMPLETE:
-	        debug_val( "Datarate = ", LMIC.datarate );
-	        // Check if we have a downlink on either Rx1 or Rx2 windows
-	        if( ( LMIC.txrxFlags & ( TXRX_DNW1 | TXRX_DNW2 ) ) != 0 )
-	        {
-	            debug_val( "LED2 = ", 1 );
-	            os_setTimedCallback( &rxLedJob, os_getTime( ) + ms2osticks( 25 ), onRxLed );
-	
-	            if( LMIC.dataLen != 0 )
-	            { // data received in rx slot after tx
-	                debug_buf( LMIC.frame + LMIC.dataBeg, LMIC.dataLen );
-	                processRxFrame( );
-	            }
-	        }
-	        txOn = true;
-	        break;
-	    default:
-	        break;
-	    }
-	    if( txOn == true )
-	    {
-	        //Sends frame every APP_TX_DUTYCYCLE +/- APP_TX_DUTYCYCLE_RND random time (if not duty cycle limited)
-	        os_setTimedCallback( &sendFrameJob,
-	                             os_getTime( ) + ms2osticks( APP_TX_DUTYCYCLE + randr( -APP_TX_DUTYCYCLE_RND, APP_TX_DUTYCYCLE_RND ) ),
-	                             onSendFrame );
-	        
-	        ////Sends frame as soon as possible (duty cylce limitations)
-	        //onSendFrame( NULL );
-	    }
-	}
+    #include "mbed.h"
+    
+    #include "lmic.h"
+    
+    #define APP_TX_DUTYCYCLE                            5000 // 5 [s] value in ms
+    #define APP_TX_DUTYCYCLE_RND                        1000 // 1 [s] value in ms
+    
+    static const uint8_t AppEui[8] =
+    {
+        0x9F, 0x01, 0x00, 0xD0, 0x7E, 0xD5, 0xB3, 0x70
+    };
+    
+    static const u1_t DevEui[8] =
+    {
+        0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01
+    };
+    
+    // device-specific AES key (derived from device EUI)
+    static const uint8_t DevKey[16] = 
+    {
+        0xBD, 0x51, 0x15, 0x4C, 0xF2, 0xB5, 0xD8, 0x3F, 0xE5, 0xF4, 0xBA, 0x09, 0xFE, 0x14, 0x85, 0x11
+    };
+    
+    osjob_t sendFrameJob;
+    
+    int32_t randr(int32_t min, int32_t max)
+    {
+        return (int32_t)rand() % (max - min + 1) + min;
+    }
+    
+    void os_getArtEui(uint8_t *buf)
+    {
+        memcpy(buf, AppEui, 8);
+    }
+    
+    void os_getDevEui(uint8_t *buf)
+    {
+        memcpy(buf, DevEui, 8);
+    }
+    
+    void os_getDevKey(uint8_t *buf)
+    {
+        memcpy(buf, DevKey, 16);
+    }
+    
+    static void onSendFrame(osjob_t* j)
+    {
+        printf("Sending frame...\n\r");
+        LMIC.frame[0] = 'H';
+        LMIC.frame[1] = 'e';
+        LMIC.frame[2] = 'i';
+        LMIC.frame[3] = ' ';
+        LMIC.frame[4] = 'v';
+        LMIC.frame[5] = 'e';
+        LMIC.frame[6] = 'r';
+        LMIC.frame[7] = 'd';
+        LMIC.frame[8] = 'e';
+        LMIC.frame[9] = 'n';
+        LMIC_setTxData2(15, LMIC.frame, 10, 0);
+    }
+    
+    // Initialization job
+    static void onInit(osjob_t* j)
+    {
+        // reset MAC state
+        LMIC_reset();
+        LMIC_setDrTxpow(DR_SF12, 14);
+    
+        // start joining
+        LMIC_startJoining();
+        // init done - onEvent() callback will be invoked...
+        
+        printf("JOINING\n\r");
+    }
+    
+    int main(void)
+    {
+        osjob_t initjob;
+    
+        // initialize runtime env
+        os_init();
+        // setup initial job
+        os_setCallback(&initjob, onInit);
+        // execute scheduled jobs and events
+        os_runloop();
+        // (not reached)
+    }
+    
+    void print_buf(const u1_t* frame, u2_t len)
+    {
+        for (u2_t i = 0; i < len; i++)
+        {
+            if (frame[i] >= ' ' && frame[i] <= 0x7e)
+                printf("%c", frame[i]);
+            else
+                printf("\\x%02X", frame[i]);
+        }
+        printf("\n\r");
+    }
+    
+    void onEvent(ev_t ev)
+    {
+        bool txOn = false;
+    
+        switch(ev)
+        {
+        // network joined, session established
+        case EV_JOINED:
+            printf("JOINED\n\r");
+            // Link check is currently not implemented for TTN, so just disable it
+            LMIC_setLinkCheckMode(0);
+            txOn = true;
+            break;
+        // scheduled data sent (optionally data received)
+        case EV_TXCOMPLETE:
+            printf("TXCOMPLETE\n\r");
+            if((LMIC.txrxFlags & (TXRX_DNW1 | TXRX_DNW2)) != 0)
+            {
+                if(LMIC.dataLen != 0)
+                { // data received in rx slot after tx
+                    printf("Received frame: ");
+                    print_buf(LMIC.frame + LMIC.dataBeg, LMIC.dataLen);
+                }
+            }
+            txOn = true;
+            break;
+        default:
+            break;
+        }
+        if(txOn == true)
+        {
+            //Sends frame every APP_TX_DUTYCYCLE +/- APP_TX_DUTYCYCLE_RND random time (if not duty cycle limited)
+            os_setTimedCallback(&sendFrameJob,
+                                os_getTime() + ms2osticks(APP_TX_DUTYCYCLE + randr(-APP_TX_DUTYCYCLE_RND, APP_TX_DUTYCYCLE_RND)),
+                                onSendFrame);
+    
+            ////Sends frame as soon as possible (duty cylce limitations)
+            //onSendFrame(NULL);
+        }
+    }
 
 **NOTE:** The AppEUI and DevEUI need to be reversed from the printout with `ttnctl` due to endianness.
 
@@ -507,3 +400,4 @@ Inspect the data using a cli MQTT client:
 You should see JSON objects where one of the properties is named `payload`. The payload contains the base64 encoded message.
 Decode it with `echo SGVpIHZlcmRlbg== | base64 -d`.
 
+This data can also easily be inspected with e.g. python and Node-RED. See [mqtt_tools](mqtt_tools) for examples.
