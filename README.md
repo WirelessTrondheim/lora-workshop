@@ -111,6 +111,7 @@ Now we are gonna attach the Semtech SX1276MB1xAS onto
 the Nucleo. Like this:
 
 ![](images/prototype.jpg)
+
 *The image includes a shield, which is not strictly necessary unless you need to interface with other stuff.*
 
 Also attach the radio antenna to ANT_HF.
